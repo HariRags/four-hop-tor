@@ -122,12 +122,27 @@ def build_circuit_with_retry(controller, hops=4, max_attempts=10):
 def keep_circuit_alive(controller, circuit_id):
     print("\nCircuit is now ready for use")
     
+    controller.set_conf('__LeaveStreamsUnattached', '1')  
+    def attach_stream(stream):
+        if stream.status == 'NEW':
+            try:
+                controller.attach_stream(stream.id, circuit_id)
+                print(f"Attached stream {stream.id} to our custom circuit {circuit_id}")
+                return True
+            except Exception as e:
+                print(f"Failed to attach stream: {e}")
+        return False
+
+    controller.add_event_listener(attach_stream, stem.control.EventType.STREAM)
+    
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         if controller.is_alive():
             try:
+                controller.remove_event_listener(attach_stream)
+                controller.reset_conf('__LeaveStreamsUnattached')
                 controller.close_circuit(circuit_id)
                 print(f"Circuit {circuit_id} closed")
             except:
